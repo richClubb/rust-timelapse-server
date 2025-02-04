@@ -1,4 +1,5 @@
-use axum::{Router, routing::get, routing::post, extract::Path};
+use axum::{Router, routing::get, routing::post};
+use axum::extract::{DefaultBodyLimit, Multipart, Path};
 
 #[tokio::main]
 async fn main() {
@@ -6,7 +7,7 @@ async fn main() {
     // our router
     let app = Router::new()
         .route("/", get(root))
-        .route("/foo/{*filename}", post(post_foo))
+        .route("/foo/{*filename}", post(post_foo)).layer(DefaultBodyLimit::max(2000000))
         .route("/foo/bar", get(foo_bar));
 
     // run our app with hyper, listening globally on port 3000
@@ -16,7 +17,14 @@ async fn main() {
 
 // which calls one of these handlers
 async fn root() {println!("root")}
-async fn post_foo(Path(path): Path<String>, test: String) {
-    println!("{:?} {:?}", path, test)
+async fn post_foo(Path(path): Path<String>, mut multipart: Multipart) {
+    println!("Received post request for {}", path);
+    println!("Entire form: {:?}", multipart);
+    // Error handling required here to cope with the payload being too large
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        let name = field.name().unwrap().to_string();
+        let data = field.bytes().await.unwrap();
+        println!("Length of `{}` is {:?} bytes", name, data.len());
+    }
 }
 async fn foo_bar() {}
