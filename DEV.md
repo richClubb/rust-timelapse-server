@@ -16,3 +16,21 @@ thread 'tokio-runtime-worker' panicked at src/main.rs:25:40:
 called `Result::unwrap()` on an `Err` value: MultipartError { source: failed to read stream }
 ```
 
+## Handling `post` requests
+
+I need to do a writeup on how to handle post requests as I think this is badly documented.
+
+## CORS
+
+What is the cors middleware? 
+
+https://fastapi.tiangolo.com/tutorial/cors/ ? Not sure what purpose it solves really.
+
+## influxdb2
+
+(https://docs.influxdata.com/influxdb/v2/install/use-docker-compose/)
+
+influxdb3 is still in alpha but worth keeping an eye on.
+
+getting the db running you have to run `docker compose up` from `integration/influxdb`
+
