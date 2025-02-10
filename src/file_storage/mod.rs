@@ -18,10 +18,8 @@ pub fn add_file(camera : &str, data: Vec<u8>) -> Result<String, Box<dyn std::err
 
     let path = format!("{}/{}/{}-{}.jpg", base_path, camera, camera, utc);
 
-    println!("{}", &path);
     std::fs::write(&path, data)?;
 
-    println!("Added files");
     Ok(path)
 }
 

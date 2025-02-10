@@ -1,4 +1,4 @@
-use influxdb2::{Client};
+use influxdb2::Client;
 use influxdb2::models::DataPoint;
 
 use futures::prelude::*;
