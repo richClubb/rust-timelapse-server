@@ -1,3 +1,6 @@
+use std::thread::sleep;
+use std::time::Duration;
+
 use influxdb2::Client;
 use influxdb2::models::DataPoint;
 
@@ -45,7 +48,7 @@ impl Database {
                                 .build()?];
 
         self.client.write("pictures", stream::iter(data)).await?;
-
+        
         span.set_status(Status::Ok);
 
         Ok(())
