@@ -6,19 +6,21 @@ use axum::http::StatusCode;
 use opentelemetry::global::ObjectSafeSpan;
 use opentelemetry::trace::{SpanKind, Status};
 use opentelemetry::{global, trace::Tracer};
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use opentelemetry_sdk::propagation::TraceContextPropagator;
-use opentelemetry_sdk::trace::TracerProvider;
 use opentelemetry_stdout::SpanExporter;
 
 mod db;
 mod file_storage;
 
-fn init_tracer() {
+fn init_tracer() -> Result<(), Box<dyn std::error::Error>> {  
     global::set_text_map_propagator(TraceContextPropagator::new());
-    let provider = TracerProvider::builder()
+    let provider = SdkTracerProvider::builder()
         .with_simple_exporter(SpanExporter::default())
         .build();
     global::set_tracer_provider(provider);
+
+    Ok(())
 }
 
 #[tokio::main]

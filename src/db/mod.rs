@@ -1,6 +1,3 @@
-use std::thread::sleep;
-use std::time::Duration;
-
 use influxdb2::Client;
 use influxdb2::models::DataPoint;
 
