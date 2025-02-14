@@ -4,19 +4,25 @@ use axum::response::Html;
 use axum::http::StatusCode;
 
 use opentelemetry::global::ObjectSafeSpan;
-use opentelemetry::trace::{SpanKind, Status};
-use opentelemetry::{global, trace::Tracer};
+use opentelemetry::trace::{FutureExt, SpanKind, Status, TraceContextExt, Tracer};
+use opentelemetry::{global, Context};
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_stdout::SpanExporter;
+
+use tracing;
 
 mod db;
 mod file_storage;
 
 fn init_tracer() -> Result<(), Box<dyn std::error::Error>> {  
-    global::set_text_map_propagator(TraceContextPropagator::new());
+
+    let otlp_exporter = opentelemetry_otlp::SpanExporter::builder().with_tonic().build()?;
+
+    //global::set_text_map_propagator(TraceContextPropagator::new());
     let provider = SdkTracerProvider::builder()
         .with_simple_exporter(SpanExporter::default())
+        .with_batch_exporter(otlp_exporter)
         .build();
     global::set_tracer_provider(provider);
 
@@ -27,6 +33,8 @@ fn init_tracer() -> Result<(), Box<dyn std::error::Error>> {
 async fn main() -> Result<(), std::fmt::Error> {
 
     init_tracer();
+
+    let tracer = global::tracer("rust-timelapse-server");
 
     let database = match db::initalise_database().await {
         Ok(db) => db,
@@ -51,6 +59,7 @@ async fn main() -> Result<(), std::fmt::Error> {
     Ok(())
 }
 
+#[tracing::instrument]
 // which calls one of these handlers
 async fn root() -> Html<&'static str>{
 
@@ -66,16 +75,21 @@ async fn root() -> Html<&'static str>{
     Html("<H1>Hello to the site</H1>")
 }
 
+#[tracing::instrument]
 async fn post_foo(Path(path): Path<String>, State(database): State<db::Database>, mut multipart: Multipart) -> StatusCode{
     
     // Error handling required here to cope with the payload being too large
-
     let tracer = global::tracer("rust-timelapse-server");
+    global::set_text_map_propagator(TraceContextPropagator::new());
 
     let mut span = tracer
         .span_builder(format!("post image request"))
         .with_kind(SpanKind::Server)
         .start(&tracer);
+
+    //let cx = Context::current();
+    let cx = Context::current_with_span(span);
+    let span = cx.span();
 
     while let Some(field) = multipart.next_field().await.unwrap() {
         //let name = field.name().unwrap().to_string();
@@ -90,7 +104,7 @@ async fn post_foo(Path(path): Path<String>, State(database): State<db::Database>
         // };
 
         // these are wrong, not sure what the right way to do things
-        let path = match file_storage::add_file(&path.as_str(), data.to_vec())
+        let path = match file_storage::add_file(&cx, &path.as_str(), data.to_vec())
         {
             Ok(path) => path,
             Err(_) => {
@@ -101,7 +115,7 @@ async fn post_foo(Path(path): Path<String>, State(database): State<db::Database>
 
         // these are wrong, not sure what the right way to do things
         // if there is an error then we need to delete the file as it's not valid
-        let _ = match database.add_entry_vec8(&path.as_str(), "data".to_string()).await {
+        let _ = match database.add_entry_vec8(&cx, &path.as_str(), "data".to_string()).await {
             Ok(_) => true,
             Err(_) => {
                 span.set_status(Status::error("Error storing entry in db"));
