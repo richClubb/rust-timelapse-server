@@ -6,25 +6,33 @@ use axum::http::StatusCode;
 use opentelemetry::global::ObjectSafeSpan;
 use opentelemetry::trace::{FutureExt, SpanKind, Status, TraceContextExt, Tracer};
 use opentelemetry::{global, Context};
+use opentelemetry_sdk::logs::SdkLoggerProvider;
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use opentelemetry_sdk::propagation::TraceContextPropagator;
 use opentelemetry_stdout::SpanExporter;
 
 use tracing;
+use tracing::info;
 
 mod db;
 mod file_storage;
 
 fn init_tracer() -> Result<(), Box<dyn std::error::Error>> {  
 
-    let otlp_exporter = opentelemetry_otlp::SpanExporter::builder().with_tonic().build()?;
+    let otlp_trace_exporter = opentelemetry_otlp::SpanExporter::builder().with_tonic().build()?;
+
+    let oltp_log_exporter = opentelemetry_otlp::LogExporter::builder().with_tonic().build()?;
 
     //global::set_text_map_propagator(TraceContextPropagator::new());
-    let provider = SdkTracerProvider::builder()
+    let trace_provider = SdkTracerProvider::builder()
         .with_simple_exporter(SpanExporter::default())
-        .with_batch_exporter(otlp_exporter)
+        .with_batch_exporter(otlp_trace_exporter)
         .build();
-    global::set_tracer_provider(provider);
+    let logger_provider = SdkLoggerProvider::builder()
+        .with_log_processor(BatchLogProcessor::builder(exporter, runtime::Tokio).build())
+        .build();
+    
+    global::set_tracer_provider( trace_provider);
 
     Ok(())
 }
@@ -91,6 +99,7 @@ async fn post_foo(Path(path): Path<String>, State(database): State<db::Database>
     let cx = Context::current_with_span(span);
     let span = cx.span();
 
+    info!("processing image post");
     while let Some(field) = multipart.next_field().await.unwrap() {
         //let name = field.name().unwrap().to_string();
         let data = field.bytes().await.unwrap();
